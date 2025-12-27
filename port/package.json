@@ -1,0 +1,12 @@
+{
+  "name": "ygopro-core",
+  "version": "0.1.0",
+  "description": "Port of the YGOPro core, branched from Project Ignis (EdoPro). Provides interface for simulating the game state.",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
