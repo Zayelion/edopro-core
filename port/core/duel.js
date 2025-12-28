@@ -101,20 +101,12 @@ class DuelMessage {
 function bufferFrom(input, size) {
   if (!input) return Buffer.alloc(0);
   let buff;
-  if (Buffer.isBuffer(input)) {
-    buff = input;
-  } else if (input instanceof Uint8Array) {
-    buff = Buffer.from(input.buffer, input.byteOffset, input.byteLength);
-  } else if (input instanceof ArrayBuffer) {
-    buff = Buffer.from(input);
-  } else if (Array.isArray(input)) {
-    buff = Buffer.from(input);
-  } else {
-    return Buffer.alloc(0);
-  }
-  if (typeof size === 'number') {
-    return buff.subarray(0, size);
-  }
+  if (Buffer.isBuffer(input)) buff = input;
+  if (!buff && input instanceof Uint8Array) buff = Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+  if (!buff && input instanceof ArrayBuffer) buff = Buffer.from(input);
+  if (!buff && Array.isArray(input)) buff = Buffer.from(input);
+  if (!buff) return Buffer.alloc(0);
+  if (typeof size === 'number') return buff.subarray(0, size);
   return buff;
 }
 
@@ -168,10 +160,10 @@ class Duel {
     this.read_script_callback = options.scriptReader || (() => {});
     this.handle_message_callback = options.logHandler || (() => {});
     this.read_card_done_callback = options.cardReaderDone || (() => {});
-    this.read_card_payload = options.payload1 || null;
-    this.read_script_payload = options.payload2 || null;
-    this.handle_message_payload = options.payload3 || null;
-    this.read_card_done_payload = options.payload4 || null;
+    this.read_card_payload = options.payload1;
+    this.read_script_payload = options.payload2;
+    this.handle_message_payload = options.payload3;
+    this.read_card_done_payload = options.payload4;
     this.cards = new Set();
     this.groups = new Set();
     this.effects = new Set();
@@ -179,12 +171,8 @@ class Duel {
     this.messages = [];
     this.buff = Buffer.alloc(0);
     this.data_cache = new Map();
-    if (!validLuaLib.value) {
-      this.lua = null;
-      this.game_field = null;
-      return;
-    }
     this.lua = new Interpreter(this, options);
+    if (!validLuaLib.value) return;
     this.game_field = new Field(this, options);
     this.game_field.temp_card = this.new_card(0);
   }
@@ -194,7 +182,6 @@ class Duel {
    */
   destroy() {
     for (const card of this.cards) {
-      // Cards are garbage collected, no manual delete required.
       this.cards.delete(card);
     }
     for (const group of this.groups) {
@@ -204,8 +191,11 @@ class Duel {
     for (const effect of this.effects) {
       this.effects.delete(effect);
     }
-    this.game_field = null;
-    this.lua = null;
+    this.game_field = undefined;
+    this.lua = undefined;
+    for (const group of this.groups) {
+      this.groups.delete(group);
+    }
   }
 
   /**
@@ -220,7 +210,7 @@ class Duel {
       this.lua?.unregister_effect(effect);
       this.effects.delete(effect);
     }
-    this.game_field = null;
+    this.game_field = undefined;
     this.lua?.collect(true);
     this.cards.clear();
     for (const group of this.groups) {
@@ -241,9 +231,7 @@ class Duel {
     const card = new Card(this);
     card.data = new CardData({});
     this.cards.add(card);
-    if (code) {
-      card.data = this.read_card(code);
-    }
+    if (code) card.data = this.read_card(code);
     card.data.code = code;
     this.lua?.register_card(card);
     return card;
