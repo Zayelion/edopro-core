@@ -20,42 +20,44 @@ present.
 
 ## Corrisponding files
 
-| C/C++ File              | Maps To                         |
-| ----------------------- | ------------------------------- |
-| bit.h                   | `core/bit.js`                   |
-| card.cpp                | `core/card.js`                  |
-| card.h                  | `core/card.js`                  |
-| common.h                | `core/common.js`                |
-| containers_fwd.h        | `core/containers_fwd.js`        |
-| duel.cpp                | `core/duel.js`                  |
-| duel.h                  | `core/duel.js`                  |
-| effect.cpp              | `core/effect.js`                |
-| effect.h                | `core/effect.js`                |
-| effect_constants.h      | `core/effect.js`                |
-| field.cpp               | `core/field.js`                 |
-| field.h                 | `core/field.js`                 |
-| function_array_helper.h | `core/function_array_helper.js` |
-| group.h                 | `core/group.js`                 |
-| interpreter.cpp         | `core/interpreter.js`           |
-| interpreter.h           | `core/interpreter.js`           |
-| libcard.cpp             | `core/libcard.js`               |
-| libdebug.cpp            | `core/libdebug.js`              |
-| libduel.cpp             | `core/libduel.js`               |
-| libeffect.cpp           | `core/libeffect.js`             |
-| libgroup.cpp            | `core/libgroup.js`              |
-| lua_obj.h               | `core/lua_obj.js`               |
-| ocgapi.cpp              | `core/ocgapi.js`                |
-| ocgapi.h                | `core/ocgapi.js`                |
-| ocgapi_constants.h      | `core/ocgapi.js`                |
-| ocgapi_types.h          | `core/ocgapi.js`                |
-| operations.cpp          | `core/operations.js`            |
-| playerop.cpp            | `core/playerop.js`              |
-| processor.cpp           | `core/processor.js`             |
-| processor_unit.h        | `core/processor.js`             |
-| processor_visit.cpp     | `core/processor.js`             |
-| progressivebuffer.h     | `core/progressivebuffer.js`     |
-| scriptlib.cpp           | `core/scriptlib.js`             |
-| scriptlib.h             | `core/scriptlib.js`             |
+| C/C++ File              | Maps To                                      |
+| ----------------------- | -------------------------------------------- |
+| bit.h                   | `core/bit.js`                                |
+| card.cpp                | `core/card.js`                               |
+| card.h                  | `core/card.js`                               |
+| common.h                | `core/common.js`                             |
+| containers_fwd.h        | `core/containers_fwd.js`                     |
+| duel.cpp                | `core/duel.js`                               |
+| duel.h                  | `core/duel.js`                               |
+| effect.cpp              | `core/effect.js`                             |
+| effect.h                | `core/effect.js`                             |
+| effect_constants.h      | `core/effect.js`                             |
+| field.cpp               | `core/field.js`                              |
+| field.h                 | `core/field.js`                              |
+| function_array_helper.h | `core/function_array_helper.js`              |
+| group.h                 | `core/group.js`                              |
+| interpreter.cpp         | `core/interpreter.js`                        |
+| interpreter.h           | `core/interpreter.js`                        |
+| libcard.cpp             | `core/libcard.js`                            |
+| libdebug.cpp            | `core/libdebug.js`                           |
+| libduel.cpp             | `core/libduel.js`                            |
+| libeffect.cpp           | `core/libeffect.js`                          |
+| libgroup.cpp            | `core/libgroup.js`                           |
+| lua_obj.h               | `core/lua_obj.js`                            |
+| ocgapi.cpp              | `core/ocgapi.js`                             |
+| ocgapi.h                | `core/ocgapi.js`                             |
+| ocgapi_constants.h      | `core/ocgapi.js`                             |
+| ocgapi_types.h          | `core/ocgapi.js`                             |
+| operations.cpp          | `core/operations.js`                         |
+| playerop.cpp            | `core/playerop.js`                           |
+| processor.cpp           | `core/processor.js` and `core/processor/*.js`|
+| processor_unit.h        | `core/processor.js`                          |
+| processor_visit.cpp     | `core/processor.js`                          |
+| progressivebuffer.h     | `core/progressivebuffer.js`                  |
+| scriptlib.cpp           | `core/scriptlib.js`                          |
+| scriptlib.h             | `core/scriptlib.js`                          |
+
+The folder `core/processor/*.js` further breaks `processor.cpp` up into 1 file per function call.
 
 ## Lua
 
