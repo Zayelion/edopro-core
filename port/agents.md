@@ -6,6 +6,10 @@ Do not ever create files outside of this folder.
 Never use null, if it can not be helped try to dispose of it, or replace it with an appropriately blank object created from a class.
 All functions must have JSDocs, no exceptions.
 
+The port leverages the `lua-state` package to host the scripting runtime. The `StateEngine` wrapper in `core/state_engine.js`
+constructs a Lua instance via the exposed factory helpers and executes loaded buffers through `doString` or `execute` when
+present.
+
 ## Linting & code style (`.eslintrc.js`)
 - **Never use `else`:** `no-else/no-else` and `no-else-return` enforce early returns / guard clauses.
 - **Syntax preferences:** single quotes, required semicolons, 2-space indentation, template literals over concatenation, `const`/`let` (no `var`).
