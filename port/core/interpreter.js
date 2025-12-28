@@ -1,6 +1,7 @@
 'use strict';
 
 const { StateEngine } = require('./state_engine');
+const { registerLuaFunctions } = require('./lua_bindings');
 
 // Implements interpreter.cpp
 
@@ -34,6 +35,7 @@ class Interpreter {
     this.duel = duel;
     this.options = options;
     this.stateEngine = options?.stateEngine ?? new StateEngine();
+    registerLuaFunctions(this.stateEngine);
     this.registeredCards = new Set();
     this.registeredEffects = new Set();
     this.registeredGroups = new Set();
