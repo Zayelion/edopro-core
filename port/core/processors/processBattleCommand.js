@@ -1,4 +1,5 @@
-bool field::process(Processors::BattleCommand& arg) {
+/**
+  bool field::process(Processors::BattleCommand& arg) {
 	switch(arg.step) {
 	case 0: {
 		core.select_chains.clear();
@@ -166,10 +167,7 @@ bool field::process(Processors::BattleCommand& arg) {
 			}
 			return FALSE;
 		}
-		/*if(core.set_forced_attack) {
-			core.set_forced_attack = false;
-			emplace_process<Processors::ForcedBattle>();
-		}*/
+
 		return TRUE;
 	}
 	case 2: {
@@ -990,3 +988,4 @@ bool field::process(Processors::BattleCommand& arg) {
 	}
 	return TRUE;
 }
+*/

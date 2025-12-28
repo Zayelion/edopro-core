@@ -1,5 +1,9 @@
 // Implements processor.cpp and processor_unit.h
 
+import { processorMap } from "./processors/functions";
+
+
+
 /**
  * Maps native process struct names to their `needs_answer` flag from the engine.
  * @type {Record<string, boolean>}
@@ -181,4 +185,5 @@ module.exports = {
   PROCESS_RESTART,
   ProcessDescriptor,
   ProcessorQueue,
+  processorMap
 };

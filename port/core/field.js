@@ -1,10 +1,10 @@
 // Implements field.cpp
-const { ProcessorQueue } = require('./processor');
+const { ProcessorQueue, processorMap } = require('./processor');
 const { visitProcessor } = require('./processor_visit');
 const { LuaParam, COROUTINE_YIELD } = require('./interpreter');
 const { OCG_CONSTANTS } = require('./ocgapi');
 const { CARD_LOCATIONS, PLAYERS } = require('./card');
-const { getProcessorStub } = require('./processor_stubs');
+
 
 /**
  * Represents a trigger event mirrored from the native engine.
@@ -157,7 +157,7 @@ class Field {
     };
     this.nil_event = new TriggerEvent();
     this.processor = new ProcessorQueue(this);
-    this.processHandlers = new Map();
+    this.processHandlers = processorMap;
     this.player = [
       new PlayerInfo(options.team1),
       new PlayerInfo(options.team2),
@@ -338,7 +338,7 @@ class Field {
    */
   dispatchProcess(unit) {
     if (!unit) return true;
-    const stub = getProcessorStub(unit.type);
+    const stub = getProcessors(unit.type);
     if (stub) return stub(this, unit);
     return this.handleProcess(unit);
   }
