@@ -1,4 +1,9 @@
 // Implements field.cpp
+const { ProcessorQueue } = require('./processor');
+const { visitProcessor } = require('./processor_visit');
+const { LuaParam, COROUTINE_YIELD } = require('./interpreter');
+const { OCG_CONSTANTS } = require('./ocgapi');
+const { CARD_LOCATIONS, PLAYERS } = require('./card');
 
 /**
  * Represents a trigger event mirrored from the native engine.
@@ -143,8 +148,15 @@ class Field {
       shuffle_deck_check: [false, false],
       shuffle_hand_check: [false, false],
       current_chain: [],
+      solving_event: [],
+      sub_solving_event: [],
+      check_level: 0,
+      reason_effect: undefined,
+      reason_player: PLAYERS.PLAYER_NONE,
     };
     this.nil_event = new TriggerEvent();
+    this.processor = new ProcessorQueue(this);
+    this.processHandlers = new Map();
     this.player = [
       new PlayerInfo(options.team1),
       new PlayerInfo(options.team2),
@@ -161,6 +173,53 @@ class Field {
       priorities: [0, 0],
       can_shuffle: true,
     };
+  }
+
+  /**
+   * Merges pending sub solving events into the main solving queue.
+   * @returns {void}
+   */
+  mergeSolvingEvents() {
+    if (!Array.isArray(this.core.sub_solving_event)) this.core.sub_solving_event = [];
+    if (!Array.isArray(this.core.solving_event)) this.core.solving_event = [];
+    if (this.core.sub_solving_event.length === 0) return;
+    this.core.solving_event = [...this.core.sub_solving_event, ...this.core.solving_event];
+    this.core.sub_solving_event = [];
+  }
+
+  /**
+   * Retrieves the array representing a specific player location.
+   * @param {PlayerInfo} info Player state container.
+   * @param {number|string|undefined} location Location identifier or human readable name.
+   * @returns {Array|undefined} Matching card list.
+   */
+  getLocationList(info, location) {
+    if (!info) return undefined;
+    if (location === OCG_CONSTANTS.LOCATION_HAND || location === CARD_LOCATIONS.LOCATION_HAND || location === 'HAND') return info.list_hand;
+    if (location === OCG_CONSTANTS.LOCATION_DECK || location === CARD_LOCATIONS.LOCATION_DECK || location === 'DECK') return info.list_main;
+    return undefined;
+  }
+
+  /**
+   * Shuffles a player's zone using the duel RNG when available.
+   * @param {number} playerid Player index.
+   * @param {number|string|undefined} location Location identifier or human readable name.
+   * @returns {void}
+   */
+  shuffle(playerid, location) {
+    const playerInfo = this.player[playerid];
+    if (!playerInfo) return;
+    const target = this.getLocationList(playerInfo, location);
+    if (!Array.isArray(target)) return;
+    let index = target.length - 1;
+    while (index > 0) {
+      const randomSource = this.duel?.random?.next ? this.duel.random.next() : Math.floor(Math.random() * (index + 1));
+      const swapIndex = Math.trunc(randomSource % (index + 1));
+      const temp = target[index];
+      target[index] = target[swapIndex];
+      target[swapIndex] = temp;
+      index -= 1;
+    }
   }
 
   /**
@@ -236,6 +295,124 @@ class Field {
       return;
     }
     if (location === 'EXTRA') playerInfo.list_extra.push(card);
+  }
+
+  /**
+   * Registers a handler for a specific process type.
+   * @param {string} type Process identifier.
+   * @param {(unit: import('./processor').ProcessDescriptor, field: Field) => boolean} handler Processing handler.
+   * @returns {void}
+   */
+  registerProcessHandler(type, handler) {
+    if (!type || typeof handler !== 'function') return;
+    this.processHandlers.set(type, handler);
+  }
+
+  /**
+   * Queues a process on the main unit list.
+   * @param {string} type Process identifier.
+   * @param {Record<string, any>} [payload] Optional payload.
+   * @returns {import('./processor').ProcessDescriptor|undefined} Created process.
+   */
+  queueProcess(type, payload) {
+    if (!this.processor) return undefined;
+    return this.processor.enqueue(type, payload);
+  }
+
+  /**
+   * Queues a process on the subunit list.
+   * @param {string} type Process identifier.
+   * @param {Record<string, any>} [payload] Optional payload.
+   * @returns {import('./processor').ProcessDescriptor|undefined} Created process.
+   */
+  queueSubProcess(type, payload) {
+    if (!this.processor) return undefined;
+    return this.processor.enqueueSubunit(type, payload);
+  }
+
+  /**
+   * Dispatches the process through registered handlers or method-based fallbacks.
+   * @param {import('./processor').ProcessDescriptor} unit Current process unit.
+   * @returns {boolean} True when the process is finished.
+   */
+  handleProcess(unit) {
+    const handler = this.processHandlers.get(unit.type);
+    if (handler) return handler(unit, this);
+    const fallbackName = `process${unit.type}`;
+    const fallback = this[fallbackName];
+    if (typeof fallback === 'function') return fallback.call(this, unit);
+    return true;
+  }
+
+  /**
+   * Executes the cost coroutine for the provided triggering effect.
+   * Mirrors the native `field::process(Processors::ExecuteCost&)` flow.
+   * @param {import('./processor').ProcessDescriptor} unit Process descriptor carrying payload data.
+   * @returns {boolean} True when the process is complete.
+   */
+  processExecuteCost(unit) {
+    const payload = unit?.payload ?? {};
+    const triggering_effect = payload.triggering_effect;
+    const triggering_player = payload.triggering_player ?? 0;
+    const lua = this.duel?.lua;
+    if (!lua) return true;
+    if (!triggering_effect?.cost) {
+      this.mergeSolvingEvents();
+      lua.parameters.length = 0;
+      this.core.solving_event.shift();
+      return true;
+    }
+    if (unit.step === 0) {
+      this.mergeSolvingEvents();
+      const event = this.core.solving_event[0] ?? this.nil_event;
+      lua.add_param(LuaParam.INT, 1, true);
+      lua.add_param(LuaParam.INT, event.reason_player ?? 0, true);
+      lua.add_param(LuaParam.INT, event.reason ?? 0, true);
+      lua.add_param(LuaParam.EFFECT, event.reason_effect, true);
+      lua.add_param(LuaParam.INT, event.event_value ?? 0, true);
+      lua.add_param(LuaParam.INT, event.event_player ?? 0, true);
+      lua.add_param(LuaParam.GROUP, event.event_cards, true);
+      lua.add_param(LuaParam.INT, triggering_player, true);
+      lua.add_param(LuaParam.EFFECT, triggering_effect, true);
+      if (this.core.check_level === 0) {
+        this.core.shuffle_deck_check[0] = false;
+        this.core.shuffle_deck_check[1] = false;
+        this.core.shuffle_hand_check[0] = false;
+        this.core.shuffle_hand_check[1] = false;
+      }
+      payload.shuffle_check_was_disabled = this.core.shuffle_check_disabled;
+      this.core.shuffle_check_disabled = false;
+      this.core.check_level += 1;
+    }
+    this.core.reason_effect = triggering_effect;
+    this.core.reason_player = triggering_player;
+    const count = this.duel.lua.parameters.length;
+    const yieldValue = { value: 0 };
+    const result = lua.call_coroutine(triggering_effect.cost, count, yieldValue, unit.step);
+    this.returns.value0 = typeof yieldValue.value === 'number' ? Math.trunc(yieldValue.value) : 0;
+    if (result !== COROUTINE_YIELD) {
+      this.core.reason_effect = undefined;
+      this.core.reason_player = PLAYERS.PLAYER_NONE;
+      this.core.check_level = Math.max(0, this.core.check_level - 1);
+      if (this.core.check_level === 0) {
+        if (this.core.shuffle_hand_check[0]) this.shuffle(0, CARD_LOCATIONS.LOCATION_HAND);
+        if (this.core.shuffle_hand_check[1]) this.shuffle(1, CARD_LOCATIONS.LOCATION_HAND);
+        if (this.core.shuffle_deck_check[0]) this.shuffle(0, CARD_LOCATIONS.LOCATION_DECK);
+        if (this.core.shuffle_deck_check[1]) this.shuffle(1, CARD_LOCATIONS.LOCATION_DECK);
+      }
+      this.core.shuffle_check_disabled = payload.shuffle_check_was_disabled;
+      this.core.solving_event.shift();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Primary processing entry point mirroring `processor_visit.cpp` semantics.
+   * @returns {number} Duel status value.
+   */
+  process() {
+    return visitProcessor(this.processor, (unit) => this.handleProcess(unit));
   }
 }
 

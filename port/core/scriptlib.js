@@ -6,6 +6,7 @@ const { registerCardLibrary } = require('./libcard');
 const { registerDebugLibrary } = require('./libdebug');
 const { registerDuelLibrary } = require('./libduel');
 const { registerEffectLibrary } = require('./libeffect');
+const { registerGroupLibrary } = require('./libgroup');
 
 const LUA_PARAM_NAMES = {
   INT: 'Int',
@@ -146,7 +147,7 @@ const pushEffectLib = (registry) => registerEffectLibrary(registry);
  * @param {ScriptLib} registry Library registry.
  * @returns {Record<string, Function>} Registered functions for chaining.
  */
-const pushGroupLib = (registry) => ({ registry });
+const pushGroupLib = (registry) => registerGroupLibrary(registry);
 
 /**
  * Registers duel library bindings on the provided registry.
