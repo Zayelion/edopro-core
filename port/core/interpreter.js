@@ -1,5 +1,7 @@
 'use strict';
 
+const { StateEngine } = require('./state_engine');
+
 // Implements interpreter.cpp
 
 /**
@@ -26,10 +28,12 @@ class Interpreter {
   /**
    * @param {import('./duel').Duel} duel Owning duel instance.
    * @param {object} options Interpreter options.
+   * @param {import('./state_engine').StateEngine} [options.stateEngine] Optional state engine override.
    */
   constructor(duel, options) {
     this.duel = duel;
     this.options = options;
+    this.stateEngine = options?.stateEngine ?? new StateEngine();
     this.registeredCards = new Set();
     this.registeredEffects = new Set();
     this.registeredGroups = new Set();
@@ -128,6 +132,7 @@ class Interpreter {
   load_script(buffer, len = 0, scriptName) { // eslint-disable-line no-unused-vars
     if (!buffer) return false;
     const name = scriptName ?? `script_${this.loadedScripts.size + 1}`;
+    if (this.stateEngine) this.stateEngine.load(name, buffer);
     this.loadedScripts.set(name, buffer);
     return true;
   }
@@ -144,6 +149,7 @@ class Interpreter {
     const filename = `${key}.lua`;
     const script = this.duel.read_script_callback(filename, this.duel.read_script_payload);
     if (!script) return false;
+    if (this.stateEngine) this.stateEngine.load(key, script);
     this.loadedScripts.set(key, script);
     return true;
   }
@@ -495,4 +501,4 @@ const COROUTINE_FINISH = 1;
 const COROUTINE_YIELD = 2;
 const COROUTINE_ERROR = 3;
 
-module.exports = { Interpreter, interpreterCpp, LuaParam, COROUTINE_FINISH, COROUTINE_YIELD, COROUTINE_ERROR };
+module.exports = { Interpreter, interpreterCpp, LuaParam, COROUTINE_FINISH, COROUTINE_YIELD, COROUTINE_ERROR, StateEngine };
