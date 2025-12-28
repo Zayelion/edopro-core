@@ -11,15 +11,15 @@ constructs a Lua instance via the exposed factory helpers and executes loaded bu
 present.
 
 ## Linting & code style (`.eslintrc.js`)
+
 - **Never use `else`:** `no-else/no-else` and `no-else-return` enforce early returns / guard clauses.
 - **Syntax preferences:** single quotes, required semicolons, 2-space indentation, template literals over concatenation, `const`/`let` (no `var`).
 - **Forbidden patterns:** `++`/`--`, bitwise ops, nested ternaries, extending natives, `eval`/`new Function`/implicit evals, `with`, and unused vars.
 - **Best practices:** Always use strict equality (`eqeqeq`), avoid lonely `if`s, and keep spacing consistent (`keyword-spacing`, `object-curly-spacing`, etc.).
 - **Documentation:** Every function must include a JSDoc comment that explains its purpose, parameters, and return value.
 
-
-
 ## Corrisponding files
+
 | C/C++ File              | Maps To                         |
 | ----------------------- | ------------------------------- |
 | bit.h                   | `core/bit.js`                   |
@@ -31,7 +31,7 @@ present.
 | duel.h                  | `core/duel.js`                  |
 | effect.cpp              | `core/effect.js`                |
 | effect.h                | `core/effect.js`                |
-| effect_constants.h      | `core/effect.js`      |
+| effect_constants.h      | `core/effect.js`                |
 | field.cpp               | `core/field.js`                 |
 | field.h                 | `core/field.js`                 |
 | function_array_helper.h | `core/function_array_helper.js` |
@@ -46,13 +46,50 @@ present.
 | lua_obj.h               | `core/lua_obj.js`               |
 | ocgapi.cpp              | `core/ocgapi.js`                |
 | ocgapi.h                | `core/ocgapi.js`                |
-| ocgapi_constants.h      | `core/ocgapi.js`      |
-| ocgapi_types.h          | `core/ocgapi.js`          |
+| ocgapi_constants.h      | `core/ocgapi.js`                |
+| ocgapi_types.h          | `core/ocgapi.js`                |
 | operations.cpp          | `core/operations.js`            |
 | playerop.cpp            | `core/playerop.js`              |
 | processor.cpp           | `core/processor.js`             |
-| processor_unit.h        | `core/processor.js`        |
-| processor_visit.cpp     | `core/processor.js`       |
+| processor_unit.h        | `core/processor.js`             |
+| processor_visit.cpp     | `core/processor.js`             |
 | progressivebuffer.h     | `core/progressivebuffer.js`     |
 | scriptlib.cpp           | `core/scriptlib.js`             |
 | scriptlib.h             | `core/scriptlib.js`             |
+
+## Lua
+
+`LUA_FUNCTION` is a macro, here is what it looks like in C++ vs JS.
+
+example
+
+```C++
+LUA_FUNCTION(SetDescription) {
+    check_param_count(L, 2);
+    self->description = lua_get<uint64_t>(L, 2);
+    return 0;
+}
+```
+
+This code registers a function called `SetDescription` to the Lua state, SetDescription should have 1 parameters or else throw an error. 
+Then `this.description` is set to be the second parameter.
+Remeber lua arrays start at 1, so there is an 1 count offset.
+
+```JS
+
+function check_param_count( values, amount) {
+    if (values.length < (amount - 1) ) {
+        throw new Error(`Error expected ${amount} parameters but got ${values.length}`);
+    }
+}
+
+function lua_get(values, index){
+    return values[index - 1]
+}
+
+state.setGlobal('SetDescription', (...values)=>{
+    check_param_count(values, 2);
+    this.description = lua_get(values, 2);
+    return 0;
+});
+```
