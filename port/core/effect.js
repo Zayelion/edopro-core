@@ -675,27 +675,9 @@ class Effect {
   }
 }
 
-/**
- * Placeholder stub for effect.cpp to track effect handling in the JavaScript port.
- * @returns {{Effect: typeof Effect, EFFECT_STATUS: typeof EFFECT_STATUS, EFFECT_TYPES: typeof EFFECT_TYPES, EFFECT_FLAGS: typeof EFFECT_FLAGS, EFFECT_FLAGS2: typeof EFFECT_FLAGS2, EFFECT_CODES: typeof EFFECT_CODES, EFFECT_EVENTS: typeof EFFECT_EVENTS, RESET_FLAGS: typeof RESET_FLAGS, EFFECT_COUNT_CODE: typeof EFFECT_COUNT_CODE}} Exposed effect helpers.
- */
-function effectCpp() {
-  return {
-    Effect,
-    EFFECT_STATUS,
-    EFFECT_TYPES,
-    EFFECT_FLAGS,
-    EFFECT_FLAGS2,
-    EFFECT_CODES,
-    EFFECT_EVENTS,
-    RESET_FLAGS,
-    EFFECT_COUNT_CODE,
-  };
-}
 
 module.exports = {
   Effect,
-  effectCpp,
   EFFECT_STATUS,
   EFFECT_TYPES,
   EFFECT_FLAGS,

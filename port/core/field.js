@@ -332,14 +332,14 @@ class Field {
   }
 
   /**
-   * Routes a processor unit to the matching stub function.
+   * Routes a processor unit to the matching processor function.
    * @param {import('./processor').ProcessDescriptor|undefined} unit Process unit awaiting handling.
    * @returns {boolean} True when the processor completes.
    */
   dispatchProcess(unit) {
     if (!unit) return true;
-    const stub = getProcessors(unit.type);
-    if (stub) return stub(this, unit);
+    const processor = getProcessors(unit.type);
+    if (processor) return processor(this, unit);
     return this.handleProcess(unit);
   }
 
@@ -431,10 +431,5 @@ class Field {
   }
 }
 
-/**
- * Placeholder stub for field.cpp encapsulating field state operations.
- * @returns {void}
- */
-function fieldCpp() {}
 
-module.exports = { Field, ChainLink, TriggerEvent, PlayerInfo, fieldCpp };
+module.exports = { Field, ChainLink, TriggerEvent, PlayerInfo };
