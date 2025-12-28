@@ -1,0 +1,4 @@
+- Implement an external awaited random number generator.
+- Properly label and document every function.
+- Create injectable and ejectable state loading.
+- Give all variables proper names.
