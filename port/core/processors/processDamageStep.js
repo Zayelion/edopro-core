@@ -1,392 +1,408 @@
-bool field::process(Processors::DamageStep& arg) {
-	auto new_attack = arg.new_attack;
-	switch(arg.step) {
-	case 0: {
-		if(core.effect_damage_step && !new_attack)
-			return TRUE;
-		core.effect_damage_step = 1;
-		std::swap(core.attacker, arg.attacker);
-		std::swap(core.attack_target, arg.attack_target);
-		arg.backup_phase = infos.phase;
-		if(core.attacker->current.location != LOCATION_MZONE || (core.attack_target && core.attack_target->current.location != LOCATION_MZONE)) {
-			arg.step = 2;
-			return FALSE;
-		}
-		if(new_attack) {
-			++core.attack_state_count[infos.turn_player];
-			++core.battled_count[infos.turn_player];
-			check_card_counter(core.attacker, ACTIVITY_ATTACK, infos.turn_player);
-		}
-		core.attacker->announced_cards.addcard(core.attack_target);
-		attack_all_target_check();
-		auto message = pduel->new_message(MSG_ATTACK);
-		message->write(core.attacker->get_info_location());
-		if(core.attack_target) {
-			message->write(core.attack_target->get_info_location());
-		} else {
-			message->write(loc_info{});
-		}
-		infos.phase = PHASE_DAMAGE;
-		(void)pduel->new_message(MSG_DAMAGE_STEP_START);
-		core.pre_field[0] = core.attacker->fieldid_r;
-		++core.attacker->attacked_count;
-		if(core.attack_target) {
-			core.pre_field[1] = core.attack_target->fieldid_r;
-			if(core.attack_target->is_position(POS_FACEDOWN)) {
-				change_position(core.attack_target, nullptr, PLAYER_NONE, core.attack_target->current.position >> 1, 0, TRUE);
-				adjust_all();
-			}
-		} else
-			core.pre_field[1] = 0;
-		return FALSE;
-	}
-	case 1: {
-		infos.phase = PHASE_DAMAGE_CAL;
-		emplace_process<Processors::BattleCommand>(Step{ 26 });
-		arg.step = 2;
-		core.reserved = std::move(arg);
-		return TRUE;
-	}
-	case 2: {
-		core.effect_damage_step = 2;
-		emplace_process<Processors::BattleCommand>(Step{ 32 }, arg.cards_destroyed_by_battle);
-		return FALSE;
-	}
-	case 3: {
-		std::swap(core.attacker, arg.attacker);
-		std::swap(core.attack_target, arg.attack_target);
-		if(core.attacker)
-			core.attacker->set_status(STATUS_ATTACK_CANCELED, TRUE);
-		if(core.attack_target)
-			core.attack_target->set_status(STATUS_ATTACK_CANCELED, TRUE);
-		core.effect_damage_step = 0;
-		infos.phase = arg.backup_phase;
-		return TRUE;
-	}
-	}
-	return TRUE;
+const { EFFECT_CODES, EFFECT_FLAGS } = require('../effect');
+const { CARD_LOCATIONS, PLAYERS } = require('../card');
+const { OCG_CONSTANTS } = require('../ocgapi');
+const { LuaParam } = require('../interpreter');
+
+const { LOCATION_MZONE } = CARD_LOCATIONS;
+const { PLAYER_NONE } = PLAYERS;
+
+const {
+  POS_FACEUP_ATTACK,
+  POS_FACEDOWN_ATTACK,
+  POS_FACEUP_DEFENSE,
+  POS_FACEDOWN_DEFENSE,
+} = OCG_CONSTANTS;
+
+const POS_ATTACK = POS_FACEUP_ATTACK | POS_FACEDOWN_ATTACK;
+const POS_FACEUP = POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE;
+const POS_FACEDOWN = POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE;
+
+const PHASE_DAMAGE = 0x20;
+const PHASE_DAMAGE_CAL = 0x40;
+
+const STATUS_ATTACK_CANCELED = 0x200000;
+
+const MSG_ATTACK = 110;
+const MSG_DAMAGE_STEP_START = 113;
+
+const DUEL_0_ATK_DESTROYED = 0x10000000;
+
+const {
+  EFFECT_DEFENSE_ATTACK,
+  EFFECT_CHANGE_BATTLE_STAT,
+  EFFECT_PIERCE,
+  EFFECT_BOTH_BATTLE_DAMAGE,
+  EFFECT_REFLECT_BATTLE_DAMAGE,
+  EFFECT_ALSO_BATTLE_DAMAGE,
+  EFFECT_CHANGE_BATTLE_DAMAGE,
+  EFFECT_NO_BATTLE_DAMAGE,
+  EFFECT_AVOID_BATTLE_DAMAGE,
+  EFFECT_BATTLE_DAMAGE_TO_EFFECT,
+  DOUBLE_DAMAGE,
+  HALF_DAMAGE,
+} = EFFECT_CODES;
+
+const { EFFECT_FLAG_PLAYER_TARGET } = EFFECT_FLAGS;
+
+const effectSortId = (left, right) => (left?.id ?? 0) - (right?.id ?? 0);
+
+const ensureBattleDamage = (core) => {
+  if (!Array.isArray(core.battle_damage)) {
+    core.battle_damage = [0, 0];
+    return;
+  }
+  core.battle_damage[0] = core.battle_damage[0] ?? 0;
+  core.battle_damage[1] = core.battle_damage[1] ?? 0;
+};
+
+const applyEffectDamageChange = (eset, context, cardForValue) => {
+  const { core, pduel } = context;
+  eset.sort(effectSortId);
+  for (let p = 0; p < 2; ++p) {
+    let doubleDam = false;
+    let halfDam = false;
+    let damValue = -1;
+    for (const peff of eset) {
+      let val = -1;
+      if (!peff.is_flag(EFFECT_FLAG_PLAYER_TARGET)) {
+        pduel.lua.add_param(LuaParam.INT, p);
+        pduel.lua.add_param(LuaParam.CARD, cardForValue);
+        val = peff.get_value(2);
+      } else if (peff.is_target_player(p)) {
+        pduel.lua.add_param(LuaParam.CARD, cardForValue);
+        val = peff.get_value(1);
+      }
+      if (val === DOUBLE_DAMAGE) {
+        doubleDam = true;
+      } else if (val === HALF_DAMAGE) {
+        halfDam = true;
+      } else if (val > 0) {
+        damValue = val;
+      } else if (val === 0) {
+        damValue = 0;
+        break;
+      }
+    }
+    if (doubleDam && halfDam) {
+      doubleDam = false;
+      halfDam = false;
+    }
+    if (doubleDam) core.battle_damage[p] *= 2;
+    if (halfDam) core.battle_damage[p] = Math.trunc(core.battle_damage[p] / 2);
+    if (damValue >= 0 && core.battle_damage[p] > 0) core.battle_damage[p] = damValue;
+  }
+};
+
+const resolveReflectAlso = (context, reflect, also, damp, pa, both) => {
+  const { core } = context;
+  if (both) {
+    if (reflect[pa] && reflect[pa].get_handler_player() === pa) {
+      core.battle_damage[1 - pa] += core.battle_damage[pa];
+      core.battle_damage[pa] = 0;
+    } else if (reflect[1 - pa] && reflect[1 - pa].get_handler_player() === pa) {
+      core.battle_damage[pa] += core.battle_damage[1 - pa];
+      core.battle_damage[1 - pa] = 0;
+    } else if (reflect[pa] && reflect[pa].get_handler_player() === 1 - pa) {
+      core.battle_damage[1 - pa] += core.battle_damage[pa];
+      core.battle_damage[pa] = 0;
+    } else if (reflect[1 - pa] && reflect[1 - pa].get_handler_player() === 1 - pa) {
+      core.battle_damage[pa] += core.battle_damage[1 - pa];
+      core.battle_damage[1 - pa] = 0;
+    }
+    return;
+  }
+  if (reflect[damp]) {
+    if (!also[1 - damp]) {
+      core.battle_damage[1 - damp] += core.battle_damage[damp];
+      core.battle_damage[damp] = 0;
+    } else {
+      core.battle_damage[1 - damp] += core.battle_damage[damp];
+      core.battle_damage[damp] = core.battle_damage[1 - damp];
+    }
+  } else if (also[damp]) {
+    if (!reflect[1 - damp]) {
+      core.battle_damage[1 - damp] += core.battle_damage[damp];
+    } else {
+      core.battle_damage[1 - damp] += core.battle_damage[damp];
+      core.battle_damage[damp] += core.battle_damage[1 - damp];
+      core.battle_damage[1 - damp] = 0;
+    }
+  }
+};
+
+const calculateBattleDamage = (context, outDamage, outReason, outDestroyed) => {
+  const { core } = context;
+  ensureBattleDamage(core);
+
+  const aa = core.attacker.get_attack();
+  const ad = core.attacker.get_defense();
+  let da = 0;
+  let dd = 0;
+  let a = aa;
+  let d;
+  const pa = core.attacker.current.controler;
+  let pd;
+  let damp = 0;
+  let damchange = null;
+  let reasonCard = null;
+  const bd = [false, false];
+  let pierce = false;
+  core.battle_damage[0] = 0;
+  core.battle_damage[1] = 0;
+
+  if (core.attacker.is_position(POS_FACEUP_DEFENSE)) {
+    const defattack = core.attacker.is_affected_by_effect(EFFECT_DEFENSE_ATTACK);
+    if (defattack && defattack.get_value(core.attacker)) a = ad;
+  }
+  let battstat = core.attacker.is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
+  if (battstat) a = battstat.get_value(core.attacker);
+
+  if (core.attack_target) {
+    da = core.attack_target.get_attack();
+    dd = core.attack_target.get_defense();
+    pd = core.attack_target.current.controler;
+    battstat = core.attack_target.is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
+    if (battstat) d = battstat.get_value(core.attack_target);
+    else if (core.attack_target.is_position(POS_ATTACK)) d = da;
+    else d = dd;
+
+    if (core.attack_target.is_position(POS_ATTACK)) {
+      if (a > d) {
+        damp = pd;
+        core.battle_damage[damp] = a - d;
+        reasonCard = core.attacker;
+        bd[1] = true;
+      } else if (a < d) {
+        damp = pa;
+        core.battle_damage[damp] = d - a;
+        reasonCard = core.attack_target;
+        bd[0] = true;
+      } else if (a !== 0 || context.is_flag?.(DUEL_0_ATK_DESTROYED)) {
+        bd[0] = true;
+        bd[1] = true;
+      }
+    } else {
+      if (a > d) {
+        const eset = [];
+        core.attacker.filter_effect(EFFECT_PIERCE, eset);
+        if (eset.length) {
+          pierce = true;
+          const dp = [0, 0];
+          for (const peff of eset) dp[1 - peff.get_handler_player()] = 1;
+          if (dp[0]) core.battle_damage[0] = a - d;
+          if (dp[1]) core.battle_damage[1] = a - d;
+          let doubleDamage = false;
+          for (const peff of eset) {
+            if (peff.get_value() === DOUBLE_DAMAGE) doubleDamage = true;
+          }
+          if (doubleDamage) {
+            if (dp[0]) core.battle_damage[0] *= 2;
+            if (dp[1]) core.battle_damage[1] *= 2;
+          }
+          let both = Boolean(dp[0] && dp[1]);
+          if (!both) {
+            damp = dp[0] ? 0 : 1;
+            if (core.attacker.is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)
+              || core.attack_target.is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)) {
+              core.battle_damage[1 - damp] = core.battle_damage[damp];
+              both = true;
+            }
+          }
+          const reflect = [null, null];
+          reflect[pd] = core.attack_target.is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attacker);
+          if (!reflect[pd]) reflect[pd] = context.is_player_affected_by_effect(pd, EFFECT_REFLECT_BATTLE_DAMAGE);
+          reflect[1 - pd] = core.attacker.is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attack_target);
+          if (!reflect[1 - pd]) reflect[1 - pd] = context.is_player_affected_by_effect(1 - pd, EFFECT_REFLECT_BATTLE_DAMAGE);
+          const also = [false, false];
+          if (!both && (core.attack_target.is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
+            || context.is_player_affected_by_effect(pd, EFFECT_ALSO_BATTLE_DAMAGE))) {
+            also[pd] = true;
+          }
+          if (!both && (core.attacker.is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
+            || context.is_player_affected_by_effect(1 - pd, EFFECT_ALSO_BATTLE_DAMAGE))) {
+            also[1 - pd] = true;
+          }
+          resolveReflectAlso(context, reflect, also, damp, pa, both);
+
+          eset.length = 0;
+          core.attacker.filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+          core.attack_target.filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+          context.filter_player_effect(pa, EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+          context.filter_player_effect(1 - pa, EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+          applyEffectDamageChange(eset, context, core.attacker);
+
+          if (core.attacker.is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
+            || core.attack_target.is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, core.attacker)
+            || context.is_player_affected_by_effect(pd, EFFECT_AVOID_BATTLE_DAMAGE)) {
+            core.battle_damage[pd] = 0;
+          }
+          if (core.attack_target.is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
+            || core.attacker.is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, core.attack_target)
+            || context.is_player_affected_by_effect(1 - pd, EFFECT_AVOID_BATTLE_DAMAGE)) {
+            core.battle_damage[1 - pd] = 0;
+          }
+          reasonCard = core.attacker;
+        }
+        bd[1] = true;
+      } else if (a < d) {
+        damp = pa;
+        core.battle_damage[damp] = d - a;
+        reasonCard = core.attack_target;
+      }
+    }
+  } else {
+    if (a !== 0) {
+      damp = 1 - pa;
+      core.battle_damage[damp] = a;
+      reasonCard = core.attacker;
+    }
+  }
+
+  if (reasonCard && !pierce && (damchange = reasonCard.is_affected_by_effect(EFFECT_BATTLE_DAMAGE_TO_EFFECT)) == null) {
+    const damCard = reasonCard === core.attacker ? core.attack_target : core.attacker;
+    let both = false;
+    if (reasonCard.is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)
+      || (damCard && damCard.is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE))) {
+      core.battle_damage[1 - damp] = core.battle_damage[damp];
+      both = true;
+    }
+    const reflect = [null, null];
+    reflect[damp] = damCard ? damCard.is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, reasonCard) : null;
+    if (!damCard || !reflect[damp]) reflect[damp] = context.is_player_affected_by_effect(damp, EFFECT_REFLECT_BATTLE_DAMAGE);
+    reflect[1 - damp] = reasonCard.is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, damCard);
+    if (!reflect[1 - damp]) reflect[1 - damp] = context.is_player_affected_by_effect(1 - damp, EFFECT_REFLECT_BATTLE_DAMAGE);
+    const also = [false, false];
+    if (!both && ((damCard && damCard.is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE))
+      || context.is_player_affected_by_effect(damp, EFFECT_ALSO_BATTLE_DAMAGE))) {
+      also[damp] = true;
+    }
+    if (!both && (reasonCard.is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
+      || context.is_player_affected_by_effect(1 - damp, EFFECT_ALSO_BATTLE_DAMAGE))) {
+      also[1 - damp] = true;
+    }
+    resolveReflectAlso(context, reflect, also, damp, pa, both);
+
+    const eset = [];
+    reasonCard.filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+    if (damCard) damCard.filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+    context.filter_player_effect(damp, EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+    context.filter_player_effect(1 - damp, EFFECT_CHANGE_BATTLE_DAMAGE, eset, false);
+    applyEffectDamageChange(eset, context, reasonCard);
+
+    if (reasonCard.is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
+      || (damCard && damCard.is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, reasonCard))
+      || context.is_player_affected_by_effect(damp, EFFECT_AVOID_BATTLE_DAMAGE)) {
+      core.battle_damage[damp] = 0;
+    }
+    if ((damCard && damCard.is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE))
+      || reasonCard.is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, damCard)
+      || context.is_player_affected_by_effect(1 - damp, EFFECT_AVOID_BATTLE_DAMAGE)) {
+      core.battle_damage[1 - damp] = 0;
+    }
+  }
+
+  if (!core.battle_damage[damp] && !core.battle_damage[1 - damp]) reasonCard = null;
+
+  if (outDamage) outDamage.value = damchange;
+  if (outReason) outReason.value = reasonCard;
+  if (outDestroyed) {
+    outDestroyed[0] = bd[0];
+    outDestroyed[1] = bd[1];
+  }
+  return { damage_change_effect: damchange, reason_card: reasonCard, battle_destroyed: bd };
+};
+
+/**
+ * Ports the native `field::process(Processors::DamageStep&)` control flow.
+ * @param {import('../processor').ProcessDescriptor|import('../field').Field} unit Process descriptor or field instance.
+ * @param {import('../field').Field} field Field instance driving resolution.
+ * @returns {boolean} True when processing completes for the current step.
+ */
+function processDamageStep(unit, field) {
+  const isFieldArg = unit && unit.core && unit.infos && unit.player;
+  const context = isFieldArg ? unit : field ?? this;
+  const arg = (isFieldArg ? field : unit?.payload ?? unit) ?? {};
+  const step = isFieldArg ? (arg.step ?? 0) : (unit?.step ?? arg.step ?? 0);
+  const setStep = (value) => {
+    if (unit && typeof unit.step === 'number') unit.step = value;
+    arg.step = value;
+  };
+  const { core, infos, pduel } = context;
+  const newAttack = Boolean(arg.new_attack);
+
+  if (!context.calculate_battle_damage) {
+    context.calculate_battle_damage = (damageOut, reasonOut, destroyedOut) => (
+      calculateBattleDamage(context, damageOut, reasonOut, destroyedOut)
+    );
+  }
+
+  switch (step) {
+    case 0: {
+      if (core.effect_damage_step && !newAttack) return true;
+      core.effect_damage_step = 1;
+      [core.attacker, arg.attacker] = [arg.attacker, core.attacker];
+      [core.attack_target, arg.attack_target] = [arg.attack_target, core.attack_target];
+      arg.backup_phase = infos.phase;
+      if (core.attacker.current.location !== LOCATION_MZONE
+        || (core.attack_target && core.attack_target.current.location !== LOCATION_MZONE)) {
+        setStep(2);
+        return false;
+      }
+      if (newAttack) {
+        core.attack_state_count[infos.turn_player] += 1;
+        core.battled_count[infos.turn_player] += 1;
+        context.check_card_counter(core.attacker, context.ACTIVITY_ATTACK, infos.turn_player);
+      }
+      core.attacker.announced_cards.addcard(core.attack_target);
+      context.attack_all_target_check();
+      const message = pduel.new_message(MSG_ATTACK);
+      message.write(core.attacker.get_info_location());
+      if (core.attack_target) {
+        message.write(core.attack_target.get_info_location());
+      } else {
+        message.write({});
+      }
+      infos.phase = PHASE_DAMAGE;
+      pduel.new_message(MSG_DAMAGE_STEP_START);
+      core.pre_field[0] = core.attacker.fieldid_r;
+      core.attacker.attacked_count += 1;
+      if (core.attack_target) {
+        core.pre_field[1] = core.attack_target.fieldid_r;
+        if (core.attack_target.is_position(POS_FACEDOWN)) {
+          context.change_position(core.attack_target, null, PLAYER_NONE, core.attack_target.current.position >> 1, 0, true);
+          context.adjust_all();
+        }
+      } else {
+        core.pre_field[1] = 0;
+      }
+      return false;
+    }
+    case 1: {
+      infos.phase = PHASE_DAMAGE_CAL;
+      context.emplace_process?.('BattleCommand', { step: 26 });
+      setStep(2);
+      core.reserved = arg;
+      return true;
+    }
+    case 2: {
+      core.effect_damage_step = 2;
+      context.emplace_process?.('BattleCommand', { step: 32 }, arg.cards_destroyed_by_battle);
+      return false;
+    }
+    case 3: {
+      [core.attacker, arg.attacker] = [arg.attacker, core.attacker];
+      [core.attack_target, arg.attack_target] = [arg.attack_target, core.attack_target];
+      if (core.attacker) core.attacker.set_status(STATUS_ATTACK_CANCELED, true);
+      if (core.attack_target) core.attack_target.set_status(STATUS_ATTACK_CANCELED, true);
+      core.effect_damage_step = 0;
+      infos.phase = arg.backup_phase;
+      return true;
+    }
+    default:
+      return true;
+  }
 }
-void field::calculate_battle_damage(effect** pdamchange, card** preason_card, std::array<bool, 2>* battle_destroyed) {
-	uint32_t aa = core.attacker->get_attack(), ad = core.attacker->get_defense();
-	uint32_t da = 0, dd = 0, a = aa, d;
-	uint8_t pa = core.attacker->current.controler, pd;
-	uint8_t damp = 0;
-	effect* damchange = nullptr;
-	card* reason_card = nullptr;
-	std::array<bool, 2> bd{};
-	bool pierce = false;
-	core.battle_damage[0] = core.battle_damage[1] = 0;
-	if(core.attacker->is_position(POS_FACEUP_DEFENSE)) {
-		effect* defattack = core.attacker->is_affected_by_effect(EFFECT_DEFENSE_ATTACK);
-		if(defattack && defattack->get_value(core.attacker))
-			a = ad;
-	}
-	effect* battstat = core.attacker->is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
-	if(battstat)
-		a = battstat->get_value(core.attacker);
-	if(core.attack_target) {
-		da = core.attack_target->get_attack();
-		dd = core.attack_target->get_defense();
-		pd = core.attack_target->current.controler;
-		battstat = core.attack_target->is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
-		if(battstat)
-			d = battstat->get_value(core.attack_target);
-		else if (core.attack_target->is_position(POS_ATTACK))
-			d = da;
-		else
-			d = dd;
-		if(core.attack_target->is_position(POS_ATTACK)) {
-			if(a > d) {
-				damp = pd;
-				core.battle_damage[damp] = a - d;
-				reason_card = core.attacker;
-				bd[1] = true;
-			} else if(a < d) {
-				damp = pa;
-				core.battle_damage[damp] = d - a;
-				reason_card = core.attack_target;
-				bd[0] = true;
-			} else {
-				if(a != 0 || is_flag(DUEL_0_ATK_DESTROYED)) {
-					bd[0] = bd[1] = true;
-				}
-			}
-		} else {
-			if(a > d) {
-				effect_set eset;
-				core.attacker->filter_effect(EFFECT_PIERCE, &eset);
-				if(eset.size()) {
-					pierce = true;
-					uint8_t dp[2] = {};
-					for(const auto& peff : eset)
-						dp[1 - peff->get_handler_player()] = 1;
-					if(dp[0])
-						core.battle_damage[0] = a - d;
-					if(dp[1])
-						core.battle_damage[1] = a - d;
-					bool double_damage = false;
-					//bool half_damage = false;
-					for(const auto& peff : eset) {
-						if(peff->get_value() == DOUBLE_DAMAGE)
-							double_damage = true;
-						//if(peff->get_value() == HALF_DAMAGE)
-						//	half_damage = true;
-					}
-					//if(double_damage && half_damage) {
-					//	double_damage = false;
-					//	half_damage = false;
-					//}
-					if(double_damage) {
-						if(dp[0])
-							core.battle_damage[0] *= 2;
-						if(dp[1])
-							core.battle_damage[1] *= 2;
-					}
-					//if(half_damage) {
-					//	if(dp[0])
-					//		core.battle_damage[0] /= 2;
-					//	if(dp[1])
-					//		core.battle_damage[1] /= 2;
-					//}
-					bool both = dp[0] && dp[1];
-					if(!both) {
-						damp = dp[0] ? 0 : 1;
-						if(core.attacker->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)
-							|| core.attack_target->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)) {
-							core.battle_damage[1 - damp] = core.battle_damage[damp];
-							both = true;
-						}
-					}
-					effect* reflect[2] = {};
-					if((reflect[pd] = core.attack_target->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attacker)) == nullptr)
-						reflect[pd] = is_player_affected_by_effect(pd, EFFECT_REFLECT_BATTLE_DAMAGE);
-					if((reflect[1 - pd] = core.attacker->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attack_target)) == nullptr)
-						reflect[1 - pd] = is_player_affected_by_effect(1 - pd, EFFECT_REFLECT_BATTLE_DAMAGE);
-					bool also[2] = { false, false };
-					if(!both
-						&& (core.attack_target->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
-							|| is_player_affected_by_effect(pd, EFFECT_ALSO_BATTLE_DAMAGE)))
-						also[pd] = true;
-					if(!both
-						&& (core.attacker->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
-							|| is_player_affected_by_effect(1 - pd, EFFECT_ALSO_BATTLE_DAMAGE)))
-						also[1 - pd] = true;
-					if(both) {
-						//turn player's effect applies first
-						if(reflect[pa] && reflect[pa]->get_handler_player() == pa) {
-							core.battle_damage[1 - pa] += core.battle_damage[pa];
-							core.battle_damage[pa] = 0;
-						} else if(reflect[1 - pa] && reflect[1 - pa]->get_handler_player() == pa) {
-							core.battle_damage[pa] += core.battle_damage[1 - pa];
-							core.battle_damage[1 - pa] = 0;
-						} else if(reflect[pa] && reflect[pa]->get_handler_player() == 1 - pa) {
-							core.battle_damage[1 - pa] += core.battle_damage[pa];
-							core.battle_damage[pa] = 0;
-						} else if(reflect[1 - pa] && reflect[1 - pa]->get_handler_player() == 1 - pa) {
-							core.battle_damage[pa] += core.battle_damage[1 - pa];
-							core.battle_damage[1 - pa] = 0;
-						}
-					} else {
-						if(reflect[damp]) {
-							if(!also[1 - damp]) {
-								core.battle_damage[1 - damp] += core.battle_damage[damp];
-								core.battle_damage[damp] = 0;
-							} else {
-								core.battle_damage[1 - damp] += core.battle_damage[damp];
-								core.battle_damage[damp] = core.battle_damage[1 - damp];
-							}
-						} else if(also[damp]) {
-							if(!reflect[1 - damp]) {
-								core.battle_damage[1 - damp] += core.battle_damage[damp];
-							} else {
-								core.battle_damage[1 - damp] += core.battle_damage[damp];
-								core.battle_damage[damp] += core.battle_damage[1 - damp];
-								core.battle_damage[1 - damp] = 0;
-							}
-						}
-					}
-					eset.clear();
-					core.attacker->filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, &eset, FALSE);
-					core.attack_target->filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, &eset, FALSE);
-					filter_player_effect(pa, EFFECT_CHANGE_BATTLE_DAMAGE, &eset, false);
-					filter_player_effect(1 - pa, EFFECT_CHANGE_BATTLE_DAMAGE, &eset, false);
-					std::sort(eset.begin(), eset.end(), effect_sort_id);
-					for(uint8_t p = 0; p < 2; ++p) {
-						bool double_dam = false;
-						bool half_dam = false;
-						int32_t dam_value = -1;
-						for(const auto& peff : eset) {
-							lua_Integer val = -1;
-							if(!peff->is_flag(EFFECT_FLAG_PLAYER_TARGET)) {
-								pduel->lua->add_param<LuaParam::INT>(p);
-								pduel->lua->add_param<LuaParam::CARD>(core.attacker);
-								val = peff->get_value(2);
-							} else if(peff->is_target_player(p)) {
-								pduel->lua->add_param<LuaParam::CARD>(core.attacker);
-								val = peff->get_value(1);
-							}
-							if(val == DOUBLE_DAMAGE) {
-								double_dam = true;
-							} else if(val == HALF_DAMAGE) {
-								half_dam = true;
-							} else if(val > 0) {
-								dam_value = static_cast<int32_t>(val);
-							} else if(val == 0) {
-								dam_value = 0;
-								break;
-							}
-						}
-						if(double_dam && half_dam) {
-							double_dam = false;
-							half_dam = false;
-						}
-						if(double_dam)
-							core.battle_damage[p] *= 2;
-						if(half_dam)
-							core.battle_damage[p] /= 2;
-						if(dam_value >= 0 && core.battle_damage[p] > 0)
-							core.battle_damage[p] = dam_value;
-					}
-					if(core.attacker->is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
-						|| core.attack_target->is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, core.attacker)
-						|| is_player_affected_by_effect(pd, EFFECT_AVOID_BATTLE_DAMAGE))
-						core.battle_damage[pd] = 0;
-					if(core.attack_target->is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
-						|| core.attacker->is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, core.attack_target)
-						|| is_player_affected_by_effect(1 - pd, EFFECT_AVOID_BATTLE_DAMAGE))
-						core.battle_damage[1 - pd] = 0;
-					reason_card = core.attacker;
-				}
-				bd[1] = true;
-			} else if(a < d) {
-				damp = pa;
-				core.battle_damage[damp] = d - a;
-				reason_card = core.attack_target;
-			}
-		}
-	} else {
-		if(a != 0) {
-			damp = 1 - pa;
-			core.battle_damage[damp] = a;
-			reason_card = core.attacker;
-		}
-	}
-	if(reason_card && !pierce
-		&& (damchange = reason_card->is_affected_by_effect(EFFECT_BATTLE_DAMAGE_TO_EFFECT)) == nullptr) {
-		card* dam_card = (reason_card == core.attacker) ? core.attack_target : core.attacker;
-		bool both = false;
-		if(reason_card->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)
-			|| (dam_card && dam_card->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE))) {
-			core.battle_damage[1 - damp] = core.battle_damage[damp];
-			both = true;
-		}
-		effect* reflect[2] = {};
-		if(!dam_card || (reflect[damp] = dam_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, reason_card)) == nullptr)
-			reflect[damp] = is_player_affected_by_effect(damp, EFFECT_REFLECT_BATTLE_DAMAGE);
-		if((reflect[1 - damp] = reason_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, dam_card)) == nullptr)
-			reflect[1 - damp] = is_player_affected_by_effect(1 - damp, EFFECT_REFLECT_BATTLE_DAMAGE);
-		bool also[2] = { false, false };
-		if(!both
-			&& ((dam_card && dam_card->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE))
-				|| is_player_affected_by_effect(damp, EFFECT_ALSO_BATTLE_DAMAGE)))
-			also[damp] = true;
-		if(!both
-			&& (reason_card->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
-				|| is_player_affected_by_effect(1 - damp, EFFECT_ALSO_BATTLE_DAMAGE)))
-			also[1 - damp] = true;
-		if(both) {
-			//turn player's effect applies first
-			if(reflect[pa] && reflect[pa]->get_handler_player() == pa) {
-				core.battle_damage[1 - pa] += core.battle_damage[pa];
-				core.battle_damage[pa] = 0;
-			} else if(reflect[1 - pa] && reflect[1 - pa]->get_handler_player() == pa) {
-				core.battle_damage[pa] += core.battle_damage[1 - pa];
-				core.battle_damage[1 - pa] = 0;
-			} else if(reflect[pa] && reflect[pa]->get_handler_player() == 1 - pa) {
-				core.battle_damage[1 - pa] += core.battle_damage[pa];
-				core.battle_damage[pa] = 0;
-			} else if(reflect[1 - pa] && reflect[1 - pa]->get_handler_player() == 1 - pa) {
-				core.battle_damage[pa] += core.battle_damage[1 - pa];
-				core.battle_damage[1 - pa] = 0;
-			}
-		} else {
-			if(reflect[damp]) {
-				if(!also[1 - damp]) {
-					core.battle_damage[1 - damp] += core.battle_damage[damp];
-					core.battle_damage[damp] = 0;
-				} else {
-					core.battle_damage[1 - damp] += core.battle_damage[damp];
-					core.battle_damage[damp] = core.battle_damage[1 - damp];
-				}
-			} else if(also[damp]) {
-				if(!reflect[1 - damp]) {
-					core.battle_damage[1 - damp] += core.battle_damage[damp];
-				} else {
-					core.battle_damage[1 - damp] += core.battle_damage[damp];
-					core.battle_damage[damp] += core.battle_damage[1 - damp];
-					core.battle_damage[1 - damp] = 0;
-				}
-			}
-		}
-		effect_set eset;
-		reason_card->filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, &eset, FALSE);
-		if(dam_card)
-			dam_card->filter_effect(EFFECT_CHANGE_BATTLE_DAMAGE, &eset, FALSE);
-		filter_player_effect(damp, EFFECT_CHANGE_BATTLE_DAMAGE, &eset, false);
-		filter_player_effect(1 - damp, EFFECT_CHANGE_BATTLE_DAMAGE, &eset, false);
-		std::sort(eset.begin(), eset.end(), effect_sort_id);
-		for(uint8_t p = 0; p < 2; ++p) {
-			bool double_dam = false;
-			bool half_dam = false;
-			int32_t dam_value = -1;
-			for(const auto& peff : eset) {
-				lua_Integer val = -1;
-				if(!peff->is_flag(EFFECT_FLAG_PLAYER_TARGET)) {
-					pduel->lua->add_param<LuaParam::INT>(p);
-					pduel->lua->add_param<LuaParam::CARD>(reason_card);
-					val = peff->get_value(2);
-				} else if(peff->is_target_player(p)) {
-					pduel->lua->add_param<LuaParam::CARD>(reason_card);
-					val = peff->get_value(1);
-				}
-				if(val == DOUBLE_DAMAGE) {
-					double_dam = true;
-				} else if(val == HALF_DAMAGE) {
-					half_dam = true;
-				} else if(val > 0) {
-					dam_value = static_cast<int32_t>(val);
-				} else if(val == 0) {
-					dam_value = 0;
-					break;
-				}
-			}
-			if(double_dam && half_dam) {
-				double_dam = false;
-				half_dam = false;
-			}
-			if(double_dam)
-				core.battle_damage[p] *= 2;
-			if(half_dam)
-				core.battle_damage[p] /= 2;
-			if(dam_value >= 0 && core.battle_damage[p] > 0)
-				core.battle_damage[p] = dam_value;
-		}
-		if(reason_card->is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE)
-			|| (dam_card && dam_card->is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, reason_card))
-			|| is_player_affected_by_effect(damp, EFFECT_AVOID_BATTLE_DAMAGE))
-			core.battle_damage[damp] = 0;
-		if((dam_card && dam_card->is_affected_by_effect(EFFECT_NO_BATTLE_DAMAGE))
-			|| reason_card->is_affected_by_effect(EFFECT_AVOID_BATTLE_DAMAGE, dam_card)
-			|| is_player_affected_by_effect(1 - damp, EFFECT_AVOID_BATTLE_DAMAGE))
-			core.battle_damage[1 - damp] = 0;
-	}
-	if(!core.battle_damage[damp] && !core.battle_damage[1 - damp])
-		reason_card = nullptr;
-	if(pdamchange)
-		*pdamchange = damchange;
-	if(preason_card)
-		*preason_card = reason_card;
-	if(battle_destroyed) {
-		*battle_destroyed = bd;
-	}
-}
+
+processDamageStep.calculate_battle_damage = calculateBattleDamage;
+
+module.exports = processDamageStep;
