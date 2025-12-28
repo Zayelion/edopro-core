@@ -12,6 +12,34 @@ function normalizeNumber(value, fallback) {
 }
 
 /**
+ * Lightweight registry describing forward-declared container types.
+ */
+class ContainersForward {
+  constructor() {
+    this.registered = new Map();
+  }
+
+  /**
+   * Registers a constructor reference for a named container.
+   * @param {string} name Container identifier.
+   * @param {Function} ctor Constructor reference.
+   * @returns {void}
+   */
+  add(name, ctor) {
+    this.registered.set(name, ctor);
+  }
+
+  /**
+   * Retrieves a previously registered constructor.
+   * @param {string} name Container identifier.
+   * @returns {Function|undefined} Previously registered constructor.
+   */
+  get(name) {
+    return this.registered.get(name);
+  }
+}
+
+/**
  * Translates a boolean comparator into an Array.sort compatible callback.
  * @param {(left: unknown, right: unknown) => boolean} compare Comparator returning true when left precedes right.
  * @returns {(left: unknown, right: unknown) => number} Sort callback for Array.sort.
@@ -259,6 +287,7 @@ module.exports = {
   EffectSortByInitialId,
   CardSet,
   EffectContainer,
+  ContainersForward,
   createCardVector,
   createEffectVector,
   createChainList,

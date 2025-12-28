@@ -67,6 +67,28 @@ const ACTIVITY_TYPES = {
 };
 
 /**
+ * Captures constants shared across the duel engine.
+ */
+class CommonConstants {
+  constructor() {
+    this.TRUE = TRUE;
+    this.FALSE = FALSE;
+    this.LOCATION_FZONE = SYMBOLIC_LOCATIONS.LOCATION_FZONE;
+    this.LOCATION_PZONE = SYMBOLIC_LOCATIONS.LOCATION_PZONE;
+    this.LOCATION_STZONE = SYMBOLIC_LOCATIONS.LOCATION_STZONE;
+    this.LOCATION_MMZONE = SYMBOLIC_LOCATIONS.LOCATION_MMZONE;
+    this.LOCATION_EMZONE = SYMBOLIC_LOCATIONS.LOCATION_EMZONE;
+    this.LOCATION_DECKBOT = LOCATION_REDIRECT.LOCATION_DECKBOT;
+    this.LOCATION_DECKSHF = LOCATION_REDIRECT.LOCATION_DECKSHF;
+    this.COIN_HEADS = COIN_RESULTS.COIN_HEADS;
+    this.COIN_TAILS = COIN_RESULTS.COIN_TAILS;
+    this.NO_FLIP_EFFECT = FLIP_EFFECT_FLAGS.NO_FLIP_EFFECT;
+    this.PLAYER_SELFDES = PLAYERS.PLAYER_SELFDES;
+    this.ActivityType = { ...ACTIVITY_TYPES };
+  }
+}
+
+/**
  * Signals that execution reached an unreachable branch.
  * @returns {never}
  */
@@ -93,6 +115,7 @@ module.exports = {
   FLIP_EFFECT_FLAGS,
   PLAYERS,
   ACTIVITY_TYPES,
+  CommonConstants,
   assume,
   unreachable,
 };
