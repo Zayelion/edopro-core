@@ -4,6 +4,7 @@ const { visitProcessor } = require('./processor_visit');
 const { LuaParam, COROUTINE_YIELD } = require('./interpreter');
 const { OCG_CONSTANTS } = require('./ocgapi');
 const { CARD_LOCATIONS, PLAYERS } = require('./card');
+const { getProcessorStub } = require('./processor_stubs');
 
 /**
  * Represents a trigger event mirrored from the native engine.
@@ -331,6 +332,18 @@ class Field {
   }
 
   /**
+   * Routes a processor unit to the matching stub function.
+   * @param {import('./processor').ProcessDescriptor|undefined} unit Process unit awaiting handling.
+   * @returns {boolean} True when the processor completes.
+   */
+  dispatchProcess(unit) {
+    if (!unit) return true;
+    const stub = getProcessorStub(unit.type);
+    if (stub) return stub(this, unit);
+    return this.handleProcess(unit);
+  }
+
+  /**
    * Dispatches the process through registered handlers or method-based fallbacks.
    * @param {import('./processor').ProcessDescriptor} unit Current process unit.
    * @returns {boolean} True when the process is finished.
@@ -409,10 +422,12 @@ class Field {
 
   /**
    * Primary processing entry point mirroring `processor_visit.cpp` semantics.
-   * @returns {number} Duel status value.
+   * @param {import('./processor').ProcessDescriptor} [unit] Optional processor unit to handle directly.
+   * @returns {number|boolean} Duel status value or completion flag when invoked directly.
    */
-  process() {
-    return visitProcessor(this.processor, (unit) => this.handleProcess(unit));
+  process(unit) {
+    if (unit) return this.dispatchProcess(unit);
+    return visitProcessor(this.processor, (current) => this.dispatchProcess(current));
   }
 }
 
