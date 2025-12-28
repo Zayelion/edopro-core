@@ -27,7 +27,7 @@ All functions must have JSDocs, no exceptions.
 | duel.h                  | `core/duel.js`                  |
 | effect.cpp              | `core/effect.js`                |
 | effect.h                | `core/effect.js`                |
-| effect_constants.h      | `core/effect_constants.js`      |
+| effect_constants.h      | `core/effect.js`      |
 | field.cpp               | `core/field.js`                 |
 | field.h                 | `core/field.js`                 |
 | function_array_helper.h | `core/function_array_helper.js` |
@@ -42,13 +42,13 @@ All functions must have JSDocs, no exceptions.
 | lua_obj.h               | `core/lua_obj.js`               |
 | ocgapi.cpp              | `core/ocgapi.js`                |
 | ocgapi.h                | `core/ocgapi.js`                |
-| ocgapi_constants.h      | `core/ocgapi_constants.js`      |
-| ocgapi_types.h          | `core/ocgapi_types.js`          |
+| ocgapi_constants.h      | `core/ocgapi.js`      |
+| ocgapi_types.h          | `core/ocgapi.js`          |
 | operations.cpp          | `core/operations.js`            |
 | playerop.cpp            | `core/playerop.js`              |
 | processor.cpp           | `core/processor.js`             |
-| processor_unit.h        | `core/processor_unit.js`        |
-| processor_visit.cpp     | `core/processor_visit.js`       |
+| processor_unit.h        | `core/processor.js`        |
+| processor_visit.cpp     | `core/processor.js`       |
 | progressivebuffer.h     | `core/progressivebuffer.js`     |
 | scriptlib.cpp           | `core/scriptlib.js`             |
 | scriptlib.h             | `core/scriptlib.js`             |
