@@ -1,30 +1,29 @@
 // Implements processor.cpp and processor_unit.h
+const processExecuteCost = require('./processExecuteCost');
+const processExecuteOperation = require('./processExecuteOperation');
+const processExecuteTarget = require('./processExecuteTarget');
+const processPhaseEvent = require('./processPhaseEvent');
+const processPointEvent = require('./processPointEvent');
+const processQuickEffect = require('./processQuickEffect');
+const processIdleCommand = require('./processIdleCommand');
+const processBattleCommand = require('./processBattleCommand');
+const processForcedBattle = require('./processForcedBattle');
+const processDamageStep = require('./processDamageStep');
+const processTurn = require('./processTurn');
+const processAddChain = require('./processAddChain');
+const processSortChain = require('./processSortChain');
+const processSolveContinuous = require('./processSolveContinuous');
+const processSolveChain = require('./processSolveChain');
+const processRefreshLoc = require('./processRefreshLoc');
+const processAdjust = require('./processAdjust');
+const processStartup = require('./processStartup');
+const processSortDeck = require('./processSortDeck');
+const processDiscardHand = require('./processDiscardHand');
+const processAttackDisable = require('./processAttackDisable');
+const processSelectFusion = require('./processSelectFusion');
+const processRefreshRelay = require('./processRefreshRelay');
 
-import processExecuteCost from "./processExecuteCost.js";
-import processExecuteOperation from "./processExecuteOperation.js";
-import processExecuteTarget from "./processExecuteTarget.js";
-import processPhaseEvent from "./processPhaseEvent.js";
-import processPointEvent from "./processPointEvent.js";
-import processQuickEffect from "./processQuickEffect.js";
-import processIdleCommand from "./processIdleCommand.js";
-import processBattleCommand from "./processBattleCommand.js";
-import processForcedBattle from "./processForcedBattle.js";
-import processDamageStep from "./processDamageStep.js";
-import processTurn from "./processTurn.js";
-import processAddChain from "./processAddChain.js";
-import processSortChain from "./processSortChain.js";
-import processSolveContinuous from "./processSolveContinuous.js";
-import processSolveChain from "./processSolveChain.js";
-import processRefreshLoc from "./processRefreshLoc.js";
-import processAdjust from "./processAdjust.js";
-import processStartup from "./processStartup.js";
-import processSortDeck from "./processSortDeck.js";
-import processDiscardHand from "./processDiscardHand.js";
-import processAttackDisable from "./processAttackDisable.js";
-import processSelectFusion from "./processSelectFusion.js";
-import processRefreshRelay from "./processRefreshRelay.js";
-
-export const processorMap = new Map([
+const processorMap = new Map([
   ['ExecuteCost', processExecuteCost],
   ['ExecuteOperation', processExecuteOperation],
   ['ExecuteTarget', processExecuteTarget],
@@ -49,3 +48,5 @@ export const processorMap = new Map([
   ['SelectFusion', processSelectFusion],
   ['RefreshRelay', processRefreshRelay],
 ]);
+
+module.exports = { processorMap };

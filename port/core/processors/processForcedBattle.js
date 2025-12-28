@@ -2,11 +2,14 @@ const { EFFECT_CODES } = require('../effect');
 
 const { EFFECT_CANNOT_BP, EFFECT_SKIP_BP } = EFFECT_CODES;
 
-const PHASE_BATTLE_START = 0x08;
-const PHASE_BATTLE_STEP = 0x10;
-const PHASE_BATTLE = 0x80;
+const { FORCED_BATTLE_CONSTANTS } = require('../processor');
 
-const MSG_NEW_PHASE = 41;
+const {
+  PHASE_BATTLE_START,
+  PHASE_BATTLE_STEP,
+  PHASE_BATTLE,
+  MSG_NEW_PHASE,
+} = FORCED_BATTLE_CONSTANTS;
 
 /**
  * Ports the native `field::process(Processors::ForcedBattle&)` control flow.

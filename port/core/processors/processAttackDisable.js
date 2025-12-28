@@ -7,7 +7,9 @@ const { EVENT_ATTACK_DISABLED } = EFFECT_EVENTS;
 
 const { LOCATION_MZONE } = CARD_LOCATIONS;
 
-const STATUS_ATTACK_CANCELED = 0x200000;
+const { ATTACK_DISABLE_CONSTANTS } = require('../processor');
+
+const { STATUS_ATTACK_CANCELED } = ATTACK_DISABLE_CONSTANTS;
 
 /**
  * Mirrors the native `field::process(Processors::AttackDisable)` routine.

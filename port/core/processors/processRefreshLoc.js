@@ -1,5 +1,5 @@
 const { EFFECT_CODES, EFFECT_FLAGS } = require('../effect');
-const { OCG_CONSTANTS } = require('../ocgapi');
+const { REFRESH_LOC_CONSTANTS } = require('../processor');
 
 const {
   EFFECT_DISABLE_FIELD,
@@ -9,9 +9,7 @@ const {
 
 const { EFFECT_FLAG_REPEAT } = EFFECT_FLAGS;
 
-const DUEL_3_COLUMNS_FIELD = 0x4000;
-
-const MSG_FIELD_DISABLED = 56;
+const { DUEL_3_COLUMNS_FIELD, MSG_FIELD_DISABLED } = REFRESH_LOC_CONSTANTS;
 
 const fieldUsedCount = (() => {
   const table = new Array(32).fill(0);

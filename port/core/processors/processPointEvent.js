@@ -1,6 +1,7 @@
 const { EFFECT_FLAGS, EFFECT_FLAGS2, EFFECT_TYPES, EFFECT_EVENTS, EFFECT_CODES } = require('../effect');
 const { CARD_LOCATIONS, PLAYERS } = require('../card');
 const { OCG_CONSTANTS } = require('../ocgapi');
+const { POINT_EVENT_CONSTANTS } = require('../processor');
 const { ChainLink, TriggerEvent, Field } = require('../field');
 const { FLIP_EFFECT_FLAGS } = require('../common');
 
@@ -31,16 +32,16 @@ const { PLAYER_NONE } = PLAYERS;
 const { POS_FACEDOWN } = OCG_CONSTANTS;
 const { NO_FLIP_EFFECT } = FLIP_EFFECT_FLAGS;
 
-const STATUS_EFFECT_ENABLED = 0x400;
-const STATUS_CHAINING = 0x10000;
-
-const DUEL_TRIGGER_WHEN_PRIVATE_KNOWLEDGE = 0x20;
-const DUEL_OCG_OBSOLETE_IGNITION = 0x100;
-const DUEL_TCG_SEGOC_NONPUBLIC = 0x100000000;
-const DUEL_TCG_SEGOC_FIRSTTRIGGER = 0x200000000;
-const DUEL_TCG_FAST_EFFECT_IGNITION = 0x400000000;
-
-const PROCESS_RESTART = 0xffff;
+const {
+  STATUS_EFFECT_ENABLED,
+  STATUS_CHAINING,
+  DUEL_TRIGGER_WHEN_PRIVATE_KNOWLEDGE,
+  DUEL_OCG_OBSOLETE_IGNITION,
+  DUEL_TCG_SEGOC_NONPUBLIC,
+  DUEL_TCG_SEGOC_FIRSTTRIGGER,
+  DUEL_TCG_FAST_EFFECT_IGNITION,
+  PROCESS_RESTART,
+} = POINT_EVENT_CONSTANTS;
 
 const forEachEffect = (collection, code, handler) => {
   if (!collection) return;

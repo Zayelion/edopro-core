@@ -2,6 +2,7 @@ const { EFFECT_CODES, EFFECT_FLAGS, EFFECT_TYPES, EFFECT_EVENTS } = require('../
 const { CARD_LOCATIONS, PLAYERS } = require('../card');
 const { OCG_CONSTANTS } = require('../ocgapi');
 const { LuaParam } = require('../interpreter');
+const { IDLE_COMMAND_CONSTANTS } = require('../processor');
 
 const {
   EFFECT_BP_FIRST_TURN,
@@ -31,25 +32,21 @@ const {
   POS_FACEDOWN,
 } = OCG_CONSTANTS;
 
-const STATUS_CHAINING = 0x10000;
-const STATUS_FORM_CHANGED = 0x100;
-
-const TIMING_MAIN_END = 0x4;
-
-const PHASE_MAIN1 = 0x04;
-const PHASE_MAIN2 = 0x100;
-const PHASE_BATTLE_START = 0x08;
-const PHASE_BATTLE_STEP = 0x10;
-const PHASE_BATTLE = 0x80;
-
-const MSG_HINT = 2;
-const MSG_NEW_PHASE = 41;
-
-const HINT_EVENT = 1;
-
-const DUEL_ATTACK_FIRST_TURN = 0x02;
-
-const PROCESS_RESTART = 0xffff;
+const {
+  STATUS_CHAINING,
+  STATUS_FORM_CHANGED,
+  TIMING_MAIN_END,
+  PHASE_MAIN1,
+  PHASE_MAIN2,
+  PHASE_BATTLE_START,
+  PHASE_BATTLE_STEP,
+  PHASE_BATTLE,
+  MSG_HINT,
+  MSG_NEW_PHASE,
+  HINT_EVENT,
+  DUEL_ATTACK_FIRST_TURN,
+  PROCESS_RESTART,
+} = IDLE_COMMAND_CONSTANTS;
 
 const forEachEffect = (collection, code, handler) => {
   if (!collection) return;

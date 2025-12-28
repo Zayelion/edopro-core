@@ -1,6 +1,7 @@
 const { EFFECT_FLAGS, EFFECT_TYPES, EFFECT_EVENTS } = require('../effect');
 const { CARD_LOCATIONS } = require('../card');
 const { OCG_CONSTANTS } = require('../ocgapi');
+const { QUICK_EFFECT_CONSTANTS } = require('../processor');
 const { ChainLink, TriggerEvent } = require('../field');
 
 const { EFFECT_FLAG_DELAY, EFFECT_FLAG_FIELD_ONLY } = EFFECT_FLAGS;
@@ -10,13 +11,13 @@ const { EVENT_FREE_CHAIN } = EFFECT_EVENTS;
 const { LOCATION_HAND, LOCATION_DECK } = CARD_LOCATIONS;
 const { POS_FACEDOWN } = OCG_CONSTANTS;
 
-const STATUS_CHAINING = 0x10000;
-
-const TIMING_ATTACK = 0x1000;
-const TIMING_DAMAGE_STEP = 0x2000;
-const TIMING_DAMAGE_CAL = 0x4000;
-
-const PROCESS_RESTART = 0xffff;
+const {
+  STATUS_CHAINING,
+  TIMING_ATTACK,
+  TIMING_DAMAGE_STEP,
+  TIMING_DAMAGE_CAL,
+  PROCESS_RESTART,
+} = QUICK_EFFECT_CONSTANTS;
 
 const forEachEffect = (collection, code, handler) => {
   if (!collection) return;

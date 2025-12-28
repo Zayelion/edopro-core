@@ -1,13 +1,8 @@
 const { EFFECT_TYPES, EFFECT_FLAGS, EFFECT_FLAGS2, EFFECT_CODES } = require('../effect');
-const { CARD_TYPES, CARD_LOCATIONS, PLAYERS } = require('../card');
-const { SYMBOLIC_LOCATIONS } = require('../common');
-const { OCG_CONSTANTS } = require('../ocgapi');
+const { CARD_TYPES, CARD_LOCATIONS } = require('../card');
+const { ADD_CHAIN_CONSTANTS } = require('../processor');
 
-const LOCATIONS = { ...CARD_LOCATIONS, ...SYMBOLIC_LOCATIONS };
-const POSITIONS = {
-  POS_FACEUP_ATTACK: OCG_CONSTANTS.POS_FACEUP_ATTACK,
-  POS_FACEUP: OCG_CONSTANTS.POS_FACEUP,
-};
+const { LOCATIONS, POSITIONS, PLAYER } = ADD_CHAIN_CONSTANTS;
 
 const {
   TYPE_FIELD,
@@ -44,7 +39,6 @@ const {
   EFFECT_BECOME_QUICK,
 } = EFFECT_CODES;
 
-const PLAYER = { ...PLAYERS };
 
 /**
  * Ports the native `field::process(Processors::AddChain)` control flow.

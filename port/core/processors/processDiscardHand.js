@@ -1,17 +1,19 @@
 const { CARD_LOCATIONS, PLAYERS } = require('../card');
 const { OCG_CONSTANTS } = require('../ocgapi');
+const { DISCARD_HAND_CONSTANTS } = require('../processor');
 
 const { PLAYER_NONE } = PLAYERS;
 const { LOCATION_GRAVE } = CARD_LOCATIONS;
 
 const POS_FACEUP = OCG_CONSTANTS.POS_FACEUP;
 
-const MSG_HINT = 2;
-const HINT_SELECTMSG = 3;
-
-const REASON_RULE = 0x400;
-const REASON_ADJUST = 0x100;
-const REASON_DISCARD = 0x4000;
+const {
+  MSG_HINT,
+  HINT_SELECTMSG,
+  REASON_RULE,
+  REASON_ADJUST,
+  REASON_DISCARD,
+} = DISCARD_HAND_CONSTANTS;
 
 /**
  * Ports the native `field::process(Processors::DiscardHand&)` control flow.
